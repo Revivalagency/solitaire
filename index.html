@@ -118,7 +118,7 @@ const SKINS = {
   dog: { name: 'Dog', dir: 'cards/', bg: 'cards/dog_background.jpg', felt: '#103434', card: '#f6e7bf' },
   rocket: { name: 'Rocket', dir: 'cards-rocket/', bg: 'cards-rocket/last_call_background.jpg', felt: '#141c22', card: '#fdf0d0' },
 };
-let skin = 'dog';  // the saved choice is read once storage is set up below
+let skin = 'rocket';  // the saved choice is read once storage is set up below
 const img = c => SKINS[skin].dir + (c.u ? `${RANKS[c.r]}_${SUIT_FILES[c.s]}.png` : 'back.png');
 function applySkin(){
   const k = SKINS[skin], root = document.documentElement.style;
