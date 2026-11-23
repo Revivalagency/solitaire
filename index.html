@@ -32,7 +32,7 @@ body{margin:0;background:var(--felt);color:var(--text);font-family:var(--font);o
 #app{height:100%;display:flex;flex-direction:column;box-sizing:border-box;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:6px 4px}
 body{background-color:var(--felt);
-  background-image:linear-gradient(to bottom,var(--felt) 0%,var(--felt) 34%,rgba(16,52,52,.55) 52%,rgba(16,52,52,0) 66%,rgba(16,52,52,0) 86%,var(--felt) 100%),url(cards/dog_background.jpg);
+  background-image:linear-gradient(to bottom,var(--felt) 0%,var(--felt) 34%,color-mix(in srgb,var(--felt) 55%,transparent) 52%,transparent 66%,transparent 86%,var(--felt) 100%),var(--skin-bg,url(cards/dog_background.jpg));
   background-size:100% 100%,cover;background-position:center,center bottom;background-repeat:no-repeat}
 @media (min-aspect-ratio:3/4){
   body{background-size:100% 100%,auto 100%;background-position:center,center}
@@ -63,9 +63,9 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
 #finish{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   max-width:none;width:auto;padding:0 36px;background:var(--cream);color:#123030;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 @media (min-aspect-ratio:3/4){ #finish{position:static;transform:none;flex:1;max-width:180px;padding:0 18px} }
-#level{display:flex;gap:4px;margin-top:4px}
-#level button{flex:none;min-height:30px;padding:0 12px;font-size:14px;border-radius:999px;border-width:1px;background:transparent;opacity:.75}
-#level button[aria-pressed="true"]{background:var(--cream);color:#123030;opacity:1}
+#level,#skins{display:flex;gap:4px;margin-top:4px}
+#level button,#skins button{flex:none;min-height:30px;padding:0 12px;font-size:14px;border-radius:999px;border-width:1px;background:transparent;opacity:.75}
+#level button[aria-pressed="true"],#skins button[aria-pressed="true"]{background:var(--cream);color:#123030;opacity:1}
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   background:rgba(13,40,40,.95);border:1.5px solid var(--cream);color:var(--cream);font:400 16px var(--serif);
   padding:10px 16px;border-radius:12px;white-space:nowrap}
@@ -87,6 +87,7 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
     <h1 id="title">Solitaire</h1>
     <div id="stats"></div>
     <div id="level" role="group" aria-label="Difficulty"><button type="button" data-l="easy">Easy</button><button type="button" data-l="normal">Normal</button><button type="button" data-l="hard">Hard</button></div>
+    <div id="skins" role="group" aria-label="Card style"></div>
   </div>
   <div id="board"></div>
   <div id="foot">
@@ -112,10 +113,23 @@ const SUITS = ['♠','♥','♦','♣'];
 const RANKS = ['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 const isRed = s => s === 1 || s === 2;
 const SUIT_FILES = ['spades','hearts','diamonds','clubs'];
-const img = c => c.u ? `cards/${RANKS[c.r]}_${SUIT_FILES[c.s]}.png` : 'cards/back.png';
+// Card skins: each is a folder of 52 faces (RANK_suit.png), back.png and a background.
+const SKINS = {
+  dog: { name: 'Dog', dir: 'cards/', bg: 'cards/dog_background.jpg', felt: '#103434', card: '#f6e7bf' },
+  rocket: { name: 'Rocket', dir: 'cards-rocket/', bg: 'cards-rocket/last_call_background.jpg', felt: '#141c22', card: '#fdf0d0' },
+};
+let skin = 'dog';  // the saved choice is read once storage is set up below
+const img = c => SKINS[skin].dir + (c.u ? `${RANKS[c.r]}_${SUIT_FILES[c.s]}.png` : 'back.png');
+function applySkin(){
+  const k = SKINS[skin], root = document.documentElement.style;
+  root.setProperty('--felt', k.felt); root.setProperty('--card', k.card); root.setProperty('--skin-bg', k.bg ? `url(${k.bg})` : 'none');
+  document.querySelectorAll('#skins button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === skin));
+  for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) new Image().src = img({ s, r, u:true });
+  new Image().src = img({ u:false });
+}
+function setSkin(id){ skin = id; store.set('qs-skin', id); applySkin(); render(); }
 // preload every card so taps never wait on an image
-for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) new Image().src = img({ s, r, u:true });
-new Image().src = 'cards/back.png';
+
 const board = document.getElementById('board');
 const $ = id => document.getElementById(id);
 
@@ -465,6 +479,12 @@ $('undo').addEventListener('click', undo);
 $('hint').addEventListener('click', hint);
 document.querySelectorAll('#level button').forEach(b => b.addEventListener('click', () => setLevel(b.dataset.l)));
 renderLevel();
+if (SKINS[store.get('qs-skin')]) skin = store.get('qs-skin');
+const skinBox = $('skins');
+skinBox.innerHTML = Object.entries(SKINS).map(([id, k]) => `<button type="button" data-s="${id}">${k.name}</button>`).join('');
+skinBox.hidden = Object.keys(SKINS).length < 2;
+skinBox.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setSkin(b.dataset.s)));
+applySkin();
 $('finish').addEventListener('click', () => { if (canAutoFinish()) { startClock(); autoFinish(); } });
 $('deal').addEventListener('click', reshuffle);
 $('again').addEventListener('click', newGame);
