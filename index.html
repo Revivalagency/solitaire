@@ -231,20 +231,103 @@ function findHint(){
   return null;
 }
 
+// ---------- solver for hints ----------
+// Searches for a win from the current position using exactly what each tap does in this app,
+// and returns the first tap on that winning path. Cards are numbers: suit*13 + rank-1, +52 when face down.
+function solveTap(limitNodes, limitMs){
+  const num = c => c.s * 13 + c.r - 1 + (c.u ? 0 : 52);
+  const T0 = { k: S.stock.map(num), w: S.waste.map(num), f: S.found.map(f => f.length), t: S.tab.map(col => col.map(num)) };
+  const suit = c => Math.floor(c / 13), rank = c => c % 13 + 1, redc = c => { const s = suit(c); return s === 1 || s === 2; };
+  const fits = (c, col) => { if (!col.length) return rank(c) === 13; const t = col[col.length - 1]; return t < 52 && redc(t) !== redc(c) && rank(t) === rank(c) + 1; };
+  function tap(T, m){
+    const N = { k: T.k, w: T.w, f: T.f, t: T.t };
+    if (m.z === 'stock') {
+      if (T.k.length) { N.k = T.k.slice(0, -1); N.w = T.w.concat(T.k[T.k.length - 1] % 52); return N; }
+      if (T.w.length) { N.k = T.w.slice().reverse().map(c => c + 52); N.w = []; return N; }
+      return null;
+    }
+    let seq;
+    if (m.z === 'waste') seq = [T.w[T.w.length - 1]];
+    else if (m.z === 'found') seq = [m.c * 13 + T.f[m.c] - 1];
+    else seq = T.t[m.c].slice(m.i);
+    const c = seq[0];
+    let to = null;
+    if (seq.length === 1 && m.z !== 'found' && T.f[suit(c)] === rank(c) - 1) to = 'f';
+    else {
+      let best = -1;
+      for (let d = 0; d < 7; d++) {
+        if (m.z === 'tab' && d === m.c) continue;
+        if (!fits(c, T.t[d])) continue;
+        if (T.t[d].length) { best = d; break; }
+        if (best < 0 && !(m.z === 'tab' && m.i === 0)) best = d;
+      }
+      if (best < 0) return null;
+      to = best;
+    }
+    N.t = T.t.slice(); N.f = T.f.slice();
+    if (m.z === 'waste') N.w = T.w.slice(0, -1);
+    else if (m.z === 'found') N.f[m.c]--;
+    else { const col = T.t[m.c].slice(0, m.i); if (col.length && col[col.length - 1] >= 52) col[col.length - 1] -= 52; N.t[m.c] = col; }
+    if (to === 'f') N.f[suit(c)]++; else N.t[to] = T.t[to].concat(seq);
+    return N;
+  }
+  function taps(T){
+    const out = [];
+    if (T.w.length) out.push({ z: 'waste' });
+    for (let c = 0; c < 7; c++) for (let i = T.t[c].length - 1; i >= 0; i--) { if (T.t[c][i] >= 52) break; out.push({ z: 'tab', c, i }); }
+    for (let s = 0; s < 4; s++) if (T.f[s]) out.push({ z: 'found', c: s });
+    out.push({ z: 'stock' });
+    return out;
+  }
+  const key = T => T.k.join(',') + '|' + T.w.join(',') + '|' + T.f.join(',') + '|' + T.t.map(c => c.join('.')).join('/');
+  // Follow the saved winning path while the player stays on it, so every hint is progress.
+  const k0 = key(T0);
+  const at = hintPlan.findIndex(step => step.k === k0);
+  if (at >= 0) { hintPlan = hintPlan.slice(at); return hintPlan[0].m; }
+  const seen = new Set(), stack = [{ T: T0, parent: null, m: null, k: k0 }], t0 = Date.now();
+  let n = 0;
+  while (stack.length) {
+    const node = stack.pop(), T = node.T;
+    if (T.f[0] + T.f[1] + T.f[2] + T.f[3] === 52) {
+      const plan = []; for (let x = node; x.parent; x = x.parent) plan.unshift({ k: x.parent.k, m: x.m });
+      hintPlan = plan; return plan.length ? plan[0].m : 'won';
+    }
+    if (seen.has(node.k)) continue; seen.add(node.k);
+    if (++n > limitNodes || (n % 500 === 0 && Date.now() - t0 > limitMs)) return 'unknown';
+    const ms = taps(T);
+    for (let j = ms.length - 1; j >= 0; j--) { const N = tap(T, ms[j]); if (N) stack.push({ T: N, parent: node, m: ms[j], k: key(N) }); }
+  }
+  return 'lost';
+}
+let hintPlan = [];
+
 let toastTimer = null;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
 function hint(){
   if (S.won || auto) return;
   render();
-  const h = findHint(), q = s => board.querySelector(s);
-  const mark = el => el && el.classList.add('hint');
-  if (!h) {
-    const t = $('toast'); t.textContent = 'No moves left. Try Reshuffle.'; t.hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2200);
+  const q = s => board.querySelector(s);
+  const mark = (el, src) => el && el.classList.add('hint', ...(src ? ['hint-from'] : []));
+  const r = solveTap(40000, 2500);
+  if (r === 'lost') return toast(S.moves ? 'No way to win from here. Tap Undo to go back.' : 'This deal can’t be won. Tap Reshuffle.');
+  if (r && typeof r === 'object') {
+    // show the tap on the winning path: the card (or deck) and where that tap sends it
+    if (r.z === 'stock') return mark(q('[data-z="stock"]'), 1);
+    let src, idx, kind = r.z, col = r.c;
+    if (r.z === 'waste') { src = S.waste; idx = S.waste.length - 1; mark([...board.querySelectorAll('[data-z="waste"]')].pop(), 1); }
+    else if (r.z === 'found') { src = S.found[r.c]; idx = src.length - 1; mark(q(`[data-z="found"][data-c="${r.c}"]`), 1); }
+    else { src = S.tab[r.c]; idx = r.i; mark(q(`[data-z="tab"][data-c="${r.c}"][data-i="${r.i}"]:not(.slot)`), 1); }
+    const d = dest(src, idx, kind, col);
+    if (d && d.f !== undefined) mark(q(`[data-z="found"][data-c="${d.f}"]`));
+    else if (d) mark([...board.querySelectorAll(`[data-z="tab"][data-c="${d.t}"]`)].pop());
     return;
   }
-  if (h.kind === 'stock') return mark(q('[data-z="stock"]'));
-  if (h.kind === 'waste') mark([...board.querySelectorAll('[data-z="waste"]')].pop());
-  else mark(q(`[data-z="tab"][data-c="${h.col}"][data-i="${h.idx}"]:not(.slot)`));
+  // search ran out of time: fall back to a simple suggestion
+  const h = findHint();
+  if (!h) return toast('No moves left. Tap Undo to go back.');
+  if (h.kind === 'stock') return mark(q('[data-z="stock"]'), 1);
+  if (h.kind === 'waste') mark([...board.querySelectorAll('[data-z="waste"]')].pop(), 1);
+  else mark(q(`[data-z="tab"][data-c="${h.col}"][data-i="${h.idx}"]:not(.slot)`), 1);
   if (h.d.f !== undefined) mark(q(`[data-z="found"][data-c="${h.d.f}"]`));
   else mark([...board.querySelectorAll(`[data-z="tab"][data-c="${h.d.t}"]`)].pop());
 }
