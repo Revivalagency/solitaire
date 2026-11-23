@@ -60,6 +60,8 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
 @media (max-width:500px){#app{padding-left:max(4px,env(safe-area-inset-left,0px));padding-right:max(4px,env(safe-area-inset-right,0px))}}
 .hint{outline:3px solid #f2c14e;outline-offset:1px;z-index:5;animation:glow 1s ease-in-out 2}
 @keyframes glow{50%{outline-color:rgba(242,193,78,.25)}}
+#finish{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  max-width:none;width:auto;padding:0 36px;background:var(--cream);color:#123030;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   background:rgba(13,40,40,.95);border:1.5px solid var(--cream);color:var(--cream);font:400 16px var(--serif);
   padding:10px 16px;border-radius:12px;white-space:nowrap}
@@ -86,6 +88,7 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
     <button id="deal" type="button">Reshuffle</button>
     <button id="undo" type="button">Undo</button>
     <button id="hint" type="button">Hint</button>
+    <button id="finish" type="button" hidden>Finish</button>
   </div>
   <div id="toast" hidden></div>
 </div>
@@ -241,13 +244,23 @@ function afterMove(){
   if (!S.stock.length && !S.waste.length && S.tab.every(col => col.every(c => c.u))) autoFinish();
 }
 
+// Once every tableau card is face up the game is always winnable (draw-1, unlimited passes),
+// so the Finish button can play out the rest, deck included.
+const canAutoFinish = () => !S.won && !auto && S.tab.every(col => col.every(c => c.u));
+
 function autoFinish(){
+  if (auto) return;
+  $('finish').hidden = true;
+  let idle = 0;
   auto = setInterval(() => {
     let moved = false;
-    for (const col of S.tab) {
-      const t = col[col.length-1];
-      if (t && canFound(t)) { col.pop(); S.found[t.s].push(t); S.moves++; moved = true; break; }
+    const tops = S.tab.filter(col => col.length);
+    if (S.waste.length) tops.push(S.waste);
+    for (const src of tops) {
+      const t = src[src.length-1];
+      if (canFound(t)) { src.pop(); S.found[t.s].push(t); S.moves++; moved = true; idle = 0; break; }
     }
+    if (!moved && idle <= (S.stock.length + S.waste.length) * 2 + 2 && drawStock()) { S.moves++; moved = true; idle++; }
     if (!moved) { clearInterval(auto); auto = null; save(); render(); return; }
     if (S.found.every(f => f.length === 13)) { clearInterval(auto); auto = null; win(); }
     else render();
@@ -325,6 +338,7 @@ function render(){
   });
   board.innerHTML = parts.join('');
   $('stats').innerHTML = `Won ${stats.w} <span>·</span> Lost ${stats.l}`;
+  $('finish').hidden = !canAutoFinish();
   $('undo').disabled = !undoStack.length || S.won;
 }
 
@@ -338,6 +352,7 @@ board.addEventListener('click', e => {
 });
 $('undo').addEventListener('click', undo);
 $('hint').addEventListener('click', hint);
+$('finish').addEventListener('click', () => { if (canAutoFinish()) { startClock(); autoFinish(); } });
 $('deal').addEventListener('click', reshuffle);
 $('again').addEventListener('click', newGame);
 addEventListener('resize', () => render());
