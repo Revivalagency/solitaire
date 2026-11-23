@@ -196,6 +196,7 @@ function undo(){
   const keep = elapsed();
   S = JSON.parse(undoStack.pop());
   S.elapsed = keep; if (runSince) runSince = Date.now();
+  if (S.moves === 0) { runSince = null; S.elapsed = 0; }
   save(); render();
 }
 
@@ -272,7 +273,10 @@ addEventListener('pagehide', () => { pauseClock(); save(); });
 
 // resume a saved game, or deal a new one
 const saved = store.get('qs-game');
-if (saved && saved.tab && !saved.won) { S = saved; render(); startClock(); }
+if (saved && saved.tab && !saved.won) {
+  S = saved; render(); startClock();
+  if (!S.stock.length && !S.waste.length && S.tab.every(col => col.every(c => c.u))) autoFinish();
+}
 else newGame();
 })();
 </script>
