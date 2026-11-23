@@ -189,7 +189,9 @@ function findHint(){
     if (d && d.t !== undefined && (i > 0 || S.tab[d.t].length)) return { src: col, idx: i, kind: 'tab', col: k, d };
   }
   if (S.waste.length) { const d = dest(S.waste, S.waste.length - 1, 'waste'); if (d) return { src: S.waste, idx: S.waste.length - 1, kind: 'waste', d }; }
-  if (S.stock.length || S.waste.length) return { kind: 'stock' };
+  // only suggest drawing if some card in the stock or waste can be played somewhere
+  const playable = c => canFound(c) || S.tab.some(col => canTab(c, col));
+  if ([...S.stock, ...S.waste].some(playable)) return { kind: 'stock' };
   return null;
 }
 
