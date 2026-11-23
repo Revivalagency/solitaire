@@ -53,6 +53,11 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
 .c,.slot{position:absolute;box-sizing:border-box;border-radius:7%/4.7%}
 .slot{border:1.5px solid var(--slot);display:flex;align-items:center;justify-content:center;color:var(--slot);background:rgba(13,40,40,.35)}
 .c{background:var(--card) center/100% 100% no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.45);overflow:hidden}
+.ix{position:absolute;left:0;right:0;top:0;height:33%;box-sizing:border-box;padding:2px 0 0 3px;
+  background:linear-gradient(var(--card) 78%,rgba(246,231,191,0));font:700 1em/1 var(--serif);
+  letter-spacing:-.06em;white-space:nowrap;color:#1b2626}
+.ix.r{color:#c0392b}
+@media (max-width:500px){#app{padding-left:max(4px,env(safe-area-inset-left,0px));padding-right:max(4px,env(safe-area-inset-right,0px))}}
 .hint{outline:3px solid #f2c14e;outline-offset:1px;z-index:5;animation:glow 1s ease-in-out 2}
 @keyframes glow{50%{outline-color:rgba(242,193,78,.25)}}
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
@@ -280,13 +285,16 @@ function reshuffle(){
 // ---------- rendering ----------
 let geo = {};
 function render(){
-  const bw = board.clientWidth, bh = board.clientHeight, gap = Math.max(3, Math.round(bw * 0.012));
+  const bw = board.clientWidth, bh = board.clientHeight, gap = bw < 500 ? 3 : Math.round(bw * 0.012);
   const W = Math.min(Math.floor((bw - gap * 6) / 7), 100), H = Math.round(W * 1.5);
   const x = i => i * (W + gap);
   geo = { W, H };
   const parts = [];
+  // On phone-size cards the art's corner number is too small to read, so a large one sits across the top.
+  const big = W < 72, ixFont = Math.round(W * 0.44);
   const card = (c, left, top, data) =>
-    `<div class="c" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;background-image:url(${img(c)})" ${data}></div>`;
+    `<div class="c" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;background-image:url(${img(c)})" ${data}>` +
+    (big && c.u ? `<span class="ix${isRed(c.s) ? ' r' : ''}" style="font-size:${ixFont}px">${RANKS[c.r]}${SUITS[c.s]}</span>` : '') + `</div>`;
   const slot = (left, top, data, label, size) =>
     `<div class="slot" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;font-size:${size}px" ${data}>${label}</div>`;
 
@@ -306,7 +314,7 @@ function render(){
   const top0 = H + gap * 3, avail = bh - top0 - 2;
   S.tab.forEach((col, k) => {
     parts.push(slot(x(k), top0, `data-z="tab" data-c="${k}" data-i="0"`, '', 0));
-    let dDown = H * 0.13, dUp = H * 0.3;
+    let dDown = H * 0.12, dUp = H * 0.33;
     let need = 0; for (let i = 0; i < col.length - 1; i++) need += col[i].u ? dUp : dDown;
     const scale = need > 0 && need + H > avail ? Math.max(0.2, (avail - H) / need) : 1;
     let y = top0;
