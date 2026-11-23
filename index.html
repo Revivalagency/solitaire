@@ -53,6 +53,11 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
 .c,.slot{position:absolute;box-sizing:border-box;border-radius:7%/4.7%}
 .slot{border:1.5px solid var(--slot);display:flex;align-items:center;justify-content:center;color:var(--slot);background:rgba(13,40,40,.35)}
 .c{background:var(--card) center/100% 100% no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.45);overflow:hidden}
+.hint{outline:3px solid #f2c14e;outline-offset:1px;z-index:5;animation:glow 1s ease-in-out 2}
+@keyframes glow{50%{outline-color:rgba(242,193,78,.25)}}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:rgba(13,40,40,.95);border:1.5px solid var(--cream);color:var(--cream);font:400 16px var(--serif);
+  padding:10px 16px;border-radius:12px;white-space:nowrap}
 .shake{animation:shake .18s linear}
 @keyframes shake{25%{translate:-3px 0}75%{translate:3px 0}}
 @media (prefers-reduced-motion:reduce){.shake{animation:none}}
@@ -75,7 +80,9 @@ button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
   <div id="foot">
     <button id="deal" type="button">Reshuffle</button>
     <button id="undo" type="button">Undo</button>
+    <button id="hint" type="button">Hint</button>
   </div>
+  <div id="toast" hidden></div>
 </div>
 <div id="win" hidden>
   <div class="box">
@@ -144,12 +151,11 @@ function canTab(c, col){
 }
 
 // Move the card at src[idx] (and everything on top of it) to the best legal spot.
-function moveFrom(src, idx, kind, col){
+// Where a tap on src[idx] would send it: { f: suit } for a foundation, { t: column } for the tableau, or null.
+function dest(src, idx, kind, col){
   const seq = src.slice(idx), c = seq[0];
-  if (!c || !c.u) return false;
-  if (seq.length === 1 && kind !== 'found' && canFound(c)) {
-    src.splice(idx); S.found[c.s].push(c); return true;
-  }
+  if (!c || !c.u) return null;
+  if (seq.length === 1 && kind !== 'found' && canFound(c)) return { f: c.s };
   let best = -1;
   for (let k = 0; k < 7; k++) {
     if (kind === 'tab' && k === col) continue;
@@ -157,8 +163,52 @@ function moveFrom(src, idx, kind, col){
     if (S.tab[k].length) { best = k; break; }
     if (best < 0 && !(kind === 'tab' && idx === 0)) best = k;  // don't shuffle a king between empty columns
   }
-  if (best < 0) return false;
-  src.splice(idx); S.tab[best].push(...seq); return true;
+  return best < 0 ? null : { t: best };
+}
+
+function moveFrom(src, idx, kind, col){
+  const d = dest(src, idx, kind, col);
+  if (!d) return false;
+  const seq = src.splice(idx);
+  if (d.f !== undefined) S.found[d.f].push(...seq); else S.tab[d.t].push(...seq);
+  return true;
+}
+
+// ---------- hint ----------
+// Finds one useful move: to a foundation, one that turns over a hidden card or clears a column,
+// then the waste card, then drawing from the stock. Shows it without making it.
+function findHint(){
+  const tops = [];
+  if (S.waste.length) tops.push({ src: S.waste, idx: S.waste.length - 1, kind: 'waste' });
+  S.tab.forEach((col, k) => { if (col.length) tops.push({ src: col, idx: col.length - 1, kind: 'tab', col: k }); });
+  for (const m of tops) { const d = dest(m.src, m.idx, m.kind, m.col); if (d && d.f !== undefined) return { ...m, d }; }
+  for (let k = 0; k < 7; k++) {
+    const col = S.tab[k], i = col.findIndex(c => c.u);
+    if (i < 0) continue;
+    const d = dest(col, i, 'tab', k);
+    if (d && d.t !== undefined && (i > 0 || S.tab[d.t].length)) return { src: col, idx: i, kind: 'tab', col: k, d };
+  }
+  if (S.waste.length) { const d = dest(S.waste, S.waste.length - 1, 'waste'); if (d) return { src: S.waste, idx: S.waste.length - 1, kind: 'waste', d }; }
+  if (S.stock.length || S.waste.length) return { kind: 'stock' };
+  return null;
+}
+
+let toastTimer = null;
+function hint(){
+  if (S.won || auto) return;
+  render();
+  const h = findHint(), q = s => board.querySelector(s);
+  const mark = el => el && el.classList.add('hint');
+  if (!h) {
+    const t = $('toast'); t.textContent = 'No moves left. Try Reshuffle.'; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2200);
+    return;
+  }
+  if (h.kind === 'stock') return mark(q('[data-z="stock"]'));
+  if (h.kind === 'waste') mark([...board.querySelectorAll('[data-z="waste"]')].pop());
+  else mark(q(`[data-z="tab"][data-c="${h.col}"][data-i="${h.idx}"]:not(.slot)`));
+  if (h.d.f !== undefined) mark(q(`[data-z="found"][data-c="${h.d.f}"]`));
+  else mark([...board.querySelectorAll(`[data-z="tab"][data-c="${h.d.t}"]`)].pop());
 }
 
 function drawStock(){
@@ -186,10 +236,12 @@ function afterMove(){
 
 function autoFinish(){
   auto = setInterval(() => {
+    let moved = false;
     for (const col of S.tab) {
       const t = col[col.length-1];
-      if (t && canFound(t)) { col.pop(); S.found[t.s].push(t); S.moves++; break; }
+      if (t && canFound(t)) { col.pop(); S.found[t.s].push(t); S.moves++; moved = true; break; }
     }
+    if (!moved) { clearInterval(auto); auto = null; save(); render(); return; }
     if (S.found.every(f => f.length === 13)) { clearInterval(auto); auto = null; win(); }
     else render();
   }, 45);
@@ -275,6 +327,7 @@ board.addEventListener('click', e => {
   if (z === 'tab') return act(() => moveFrom(S.tab[c], i, 'tab', c), el);
 });
 $('undo').addEventListener('click', undo);
+$('hint').addEventListener('click', hint);
 $('deal').addEventListener('click', reshuffle);
 $('again').addEventListener('click', newGame);
 addEventListener('resize', () => render());
