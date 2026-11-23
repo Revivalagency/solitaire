@@ -15,12 +15,14 @@
 <style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;background:#1d5a3a}</style>
 </head>
 <body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text&display=swap">
 <style>
 /* Layout: one-screen felt table. Top bar, then stock/waste/foundations row, then 7 tableau columns filling the rest. */
 :root{
-  --felt:#1d5a3a; --felt-edge:#164a2f; --card:#fbfaf5; --ink:#17191a; --red:#c3322b;
-  --back:#27477f; --back-line:#3a5f9e; --slot:rgba(255,255,255,.22); --text:#eaf3ec; --btn:rgba(0,0,0,.22);
+  --felt:#103434; --felt-edge:#0d2828; --card:#f6e7bf; --ink:#17191a; --cream:#f3e3b8;
+  --slot:rgba(243,227,184,.55); --text:#f3e3b8;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  --serif:"Libre Caslon Text",Georgia,"Times New Roman",serif;
   color-scheme:dark;
 }
 [hidden]{display:none!important}
@@ -29,23 +31,28 @@ body{margin:0;background:var(--felt);color:var(--text);font-family:var(--font);o
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{height:100%;display:flex;flex-direction:column;box-sizing:border-box;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:6px 4px}
-#bar{display:flex;align-items:center;gap:8px;min-height:44px}
-#stats{flex:1;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.01em}
-#stats span{opacity:.7;font-weight:500}
-button{font:600 15px var(--font);color:var(--text);background:var(--btn);border:0;border-radius:10px;
-  min-height:40px;padding:0 14px;cursor:pointer}
-button:active{background:rgba(0,0,0,.4)}
-button:disabled{opacity:.35}
-button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
-#board{position:relative;flex:1;margin-top:6px}
-.c,.slot{position:absolute;box-sizing:border-box;border-radius:6px}
-.slot{border:1.5px solid var(--slot);display:flex;align-items:center;justify-content:center;color:var(--slot)}
-.c{background:var(--card);color:var(--ink);border:1px solid rgba(0,0,0,.25);box-shadow:0 1px 1px rgba(0,0,0,.25);overflow:hidden}
-.c.r{color:var(--red)}
-.c .k{position:absolute;left:3px;top:1px;font-weight:700;line-height:1;letter-spacing:-.04em;white-space:nowrap}
-.c .b{position:absolute;right:3px;bottom:2px;line-height:1}
-.c.d{background:var(--back);border:2px solid var(--card);
-  background-image:repeating-linear-gradient(45deg,var(--back-line) 0 2px,transparent 2px 7px)}
+body{background-color:var(--felt);
+  background-image:linear-gradient(to bottom,var(--felt) 0%,var(--felt) 34%,rgba(16,52,52,.55) 52%,rgba(16,52,52,0) 66%,rgba(16,52,52,0) 86%,var(--felt) 100%),url(cards/dog_background.jpg);
+  background-size:100% 100%,cover;background-position:center,center bottom;background-repeat:no-repeat}
+@media (min-aspect-ratio:3/4){
+  body{background-size:100% 100%,auto 100%;background-position:center,center}
+  #app{max-width:600px;margin:0 auto}
+}
+#bar{display:flex;flex-direction:column;align-items:center;gap:0;padding-top:2px}
+#title{margin:0;font:400 30px/1.1 var(--serif);color:var(--cream);letter-spacing:.01em;display:flex;align-items:center;gap:12px}
+#title::before,#title::after{content:"";width:28px;height:1.5px;background:var(--cream);opacity:.8}
+#stats{font:400 14px var(--serif);color:var(--cream);opacity:.85;font-variant-numeric:tabular-nums;margin-top:2px}
+#stats span{opacity:.6}
+#foot{display:flex;gap:12px;justify-content:center;padding-top:6px}
+button{font:400 18px var(--serif);color:var(--cream);background:rgba(13,40,40,.88);border:1.5px solid var(--cream);border-radius:14px;
+  min-height:46px;padding:0 18px;cursor:pointer;flex:1;max-width:180px}
+button:active{background:rgba(0,0,0,.6)}
+button:disabled{opacity:.4}
+button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
+#board{position:relative;flex:1;margin-top:8px}
+.c,.slot{position:absolute;box-sizing:border-box;border-radius:7%/4.7%}
+.slot{border:1.5px solid var(--slot);display:flex;align-items:center;justify-content:center;color:var(--slot);background:rgba(13,40,40,.35)}
+.c{background:var(--card) center/100% 100% no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.45);overflow:hidden}
 .shake{animation:shake .18s linear}
 @keyframes shake{25%{translate:-3px 0}75%{translate:3px 0}}
 @media (prefers-reduced-motion:reduce){.shake{animation:none}}
@@ -54,16 +61,21 @@ button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
   box-shadow:0 8px 30px rgba(0,0,0,.4)}
 #win h2{margin:0 0 14px;font-size:26px}
 #win p{margin:4px 0;font-size:20px;font-variant-numeric:tabular-nums}
-#win button{margin-top:18px;width:100%;min-height:48px;font-size:17px;background:var(--card);color:var(--ink)}
+#win h2,#win p{font-family:var(--serif);font-weight:400;color:var(--cream)}
+#win .box{border:1.5px solid var(--cream)}
+#win button{margin-top:18px;width:100%;max-width:none;min-height:48px;font-size:17px;background:var(--card);color:var(--ink)}
 </style>
 
 <div id="app">
   <div id="bar">
+    <h1 id="title">Solitaire</h1>
     <div id="stats"></div>
-    <button id="undo" type="button">Undo</button>
-    <button id="deal" type="button">Reshuffle</button>
   </div>
   <div id="board"></div>
+  <div id="foot">
+    <button id="deal" type="button">Reshuffle</button>
+    <button id="undo" type="button">Undo</button>
+  </div>
 </div>
 <div id="win" hidden>
   <div class="box">
@@ -79,6 +91,11 @@ button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 const SUITS = ['♠','♥','♦','♣'];
 const RANKS = ['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 const isRed = s => s === 1 || s === 2;
+const SUIT_FILES = ['spades','hearts','diamonds','clubs'];
+const img = c => c.u ? `cards/${RANKS[c.r]}_${SUIT_FILES[c.s]}.png` : 'cards/back.png';
+// preload every card so taps never wait on an image
+for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) new Image().src = img({ s, r, u:true });
+new Image().src = 'cards/back.png';
 const board = document.getElementById('board');
 const $ = id => document.getElementById(id);
 
@@ -210,17 +227,12 @@ function reshuffle(){
 let geo = {};
 function render(){
   const bw = board.clientWidth, bh = board.clientHeight, gap = Math.max(3, Math.round(bw * 0.012));
-  const W = Math.min(Math.floor((bw - gap * 6) / 7), 100), H = Math.round(W * 1.42);
+  const W = Math.min(Math.floor((bw - gap * 6) / 7), 100), H = Math.round(W * 1.5);
   const x = i => i * (W + gap);
   geo = { W, H };
-  const kFont = Math.round(W * 0.34), bFont = Math.round(W * 0.5);
   const parts = [];
-  const card = (c, left, top, data) => {
-    if (!c.u) return `<div class="c d" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px" ${data}></div>`;
-    return `<div class="c${isRed(c.s) ? ' r' : ''}" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px" ${data}>` +
-      `<span class="k" style="font-size:${kFont}px">${RANKS[c.r]}${SUITS[c.s]}</span>` +
-      `<span class="b" style="font-size:${bFont}px">${SUITS[c.s]}</span></div>`;
-  };
+  const card = (c, left, top, data) =>
+    `<div class="c" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;background-image:url(${img(c)})" ${data}></div>`;
   const slot = (left, top, data, label, size) =>
     `<div class="slot" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;font-size:${size}px" ${data}>${label}</div>`;
 
