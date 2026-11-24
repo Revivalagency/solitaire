@@ -36,7 +36,7 @@ body{background-color:var(--felt);
   background-size:100% 100%,cover;background-position:center,center bottom;background-repeat:no-repeat}
 @media (min-aspect-ratio:3/4){
   body{background-size:100% 100%,auto 100%;background-position:center,center}
-  #app{max-width:600px;margin:0 auto}
+  #app{max-width:900px;margin:0 auto}
 }
 #bar{display:flex;flex-direction:column;align-items:center;gap:0;padding-top:2px}
 #title{margin:0;font:400 30px/1.1 var(--serif);color:var(--cream);letter-spacing:.01em;display:flex;align-items:center;gap:12px}
@@ -50,12 +50,16 @@ button:active{background:rgba(0,0,0,.6)}
 button:disabled{opacity:.4}
 button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
 #board{position:relative;flex:1;margin-top:8px}
-.c,.slot{position:absolute;box-sizing:border-box;border-radius:7%/4.7%}
+.c,.slot{position:absolute;left:0;top:0;box-sizing:border-box;border-radius:7%/4.7%}
 .slot{border:1.5px solid var(--slot);display:flex;align-items:center;justify-content:center;color:var(--slot);background:color-mix(in srgb,var(--felt) 35%,transparent)}
-.c{background:var(--card) center/100% 100% no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.45);overflow:hidden}
-.ix{position:absolute;left:0;right:0;top:0;height:33%;box-sizing:border-box;padding:2px 0 0 3px;
-  background:linear-gradient(var(--card) 78%,rgba(246,231,191,0));font:700 1em/1 var(--serif);
-  letter-spacing:-.06em;white-space:nowrap;color:#1b2626}
+.c{background:var(--card) center/100% 100% no-repeat;box-shadow:0 1px 3px rgba(0,0,0,.55);overflow:hidden;
+  will-change:transform;backface-visibility:hidden;transition:transform .2s cubic-bezier(.2,.7,.3,1)}
+.c.moving{z-index:900!important}
+#board.still .c{transition:none}
+@media (prefers-reduced-motion:reduce){.c{transition:none}}
+.ix{position:absolute;left:0;right:0;top:0;height:30%;box-sizing:border-box;padding:1px 0 0 3px;
+  background:var(--card);border-bottom:1px solid rgba(0,0,0,.12);font:700 1em/1 var(--serif);
+  letter-spacing:-.04em;white-space:nowrap;color:#111}
 .ix.r{color:#c0392b}
 @media (max-width:500px){#app{padding-left:max(4px,env(safe-area-inset-left,0px));padding-right:max(4px,env(safe-area-inset-right,0px))}}
 .hint{outline:3px solid #f2c14e;outline-offset:1px;z-index:5;animation:glow 1s ease-in-out 2}
@@ -329,29 +333,30 @@ function hint(){
   if (S.won || auto) return;
   render();
   const q = s => board.querySelector(s);
+  const topOf = s => [...board.querySelectorAll(s)].sort((a, b) => a.style.zIndex - b.style.zIndex).pop();
   const mark = (el, src) => el && el.classList.add('hint', ...(src ? ['hint-from'] : []));
   const r = solveTap(40000, 2500);
   if (r === 'lost') return toast(S.moves ? 'No way to win from here. Tap Undo to go back.' : 'This deal can’t be won. Tap Reshuffle.');
   if (r && typeof r === 'object') {
     // show the tap on the winning path: the card (or deck) and where that tap sends it
-    if (r.z === 'stock') return mark(q('[data-z="stock"]'), 1);
+    if (r.z === 'stock') return mark(topOf('[data-z="stock"]'), 1);
     let src, idx, kind = r.z, col = r.c;
-    if (r.z === 'waste') { src = S.waste; idx = S.waste.length - 1; mark([...board.querySelectorAll('[data-z="waste"]')].pop(), 1); }
-    else if (r.z === 'found') { src = S.found[r.c]; idx = src.length - 1; mark(q(`[data-z="found"][data-c="${r.c}"]`), 1); }
+    if (r.z === 'waste') { src = S.waste; idx = S.waste.length - 1; mark(topOf('[data-z="waste"]'), 1); }
+    else if (r.z === 'found') { src = S.found[r.c]; idx = src.length - 1; mark(topOf(`[data-z="found"][data-c="${r.c}"]`), 1); }
     else { src = S.tab[r.c]; idx = r.i; mark(q(`[data-z="tab"][data-c="${r.c}"][data-i="${r.i}"]:not(.slot)`), 1); }
     const d = dest(src, idx, kind, col);
-    if (d && d.f !== undefined) mark(q(`[data-z="found"][data-c="${d.f}"]`));
-    else if (d) mark([...board.querySelectorAll(`[data-z="tab"][data-c="${d.t}"]`)].pop());
+    if (d && d.f !== undefined) mark(topOf(`[data-z="found"][data-c="${d.f}"]`));
+    else if (d) mark(topOf(`[data-z="tab"][data-c="${d.t}"]`));
     return;
   }
   // search ran out of time: fall back to a simple suggestion
   const h = findHint();
   if (!h) return toast('No moves left. Tap Undo to go back.');
-  if (h.kind === 'stock') return mark(q('[data-z="stock"]'), 1);
-  if (h.kind === 'waste') mark([...board.querySelectorAll('[data-z="waste"]')].pop(), 1);
+  if (h.kind === 'stock') return mark(topOf('[data-z="stock"]'), 1);
+  if (h.kind === 'waste') mark(topOf('[data-z="waste"]'), 1);
   else mark(q(`[data-z="tab"][data-c="${h.col}"][data-i="${h.idx}"]:not(.slot)`), 1);
-  if (h.d.f !== undefined) mark(q(`[data-z="found"][data-c="${h.d.f}"]`));
-  else mark([...board.querySelectorAll(`[data-z="tab"][data-c="${h.d.t}"]`)].pop());
+  if (h.d.f !== undefined) mark(topOf(`[data-z="found"][data-c="${h.d.f}"]`));
+  else mark(topOf(`[data-z="tab"][data-c="${h.d.t}"]`));
 }
 
 function drawStock(){
@@ -397,7 +402,7 @@ function autoFinish(){
     if (!moved) { clearInterval(auto); auto = null; save(); render(); return; }
     if (S.found.every(f => f.length === 13)) { clearInterval(auto); auto = null; win(); }
     else render();
-  }, 45);
+  }, 90);
 }
 
 function win(){
@@ -429,47 +434,87 @@ function reshuffle(){
 }
 
 // ---------- rendering ----------
+// Each card and slot keeps one element for the whole game. A move only changes its position,
+// so cards slide to their new spot instead of the whole table being redrawn (which flickered).
 let geo = {};
+const els = new Map();  // key -> element
+let lastW = 0;
+function setData(el, data){
+  for (const k of ['z','c','i']) { if (data[k] === undefined) delete el.dataset[k]; else el.dataset[k] = data[k]; }
+}
 function render(){
   const bw = board.clientWidth, bh = board.clientHeight, gap = bw < 500 ? 3 : Math.round(bw * 0.012);
-  const W = Math.min(Math.floor((bw - gap * 6) / 7), 100), H = Math.round(W * 1.5);
+  // As wide as 7 columns allow, but short enough that the top row plus a typical column fits the height.
+  const W = Math.max(30, Math.min(Math.floor((bw - gap * 6) / 7), Math.floor(bh / 5.4), 140)), H = Math.round(W * 1.5);
   const x = i => i * (W + gap);
   geo = { W, H };
-  const parts = [];
+  const resized = W !== lastW; lastW = W;
+  if (resized) board.classList.add('still');
   // On phone-size cards the art's corner number is too small to read, so a large one sits across the top.
-  const big = W < 72, ixFont = Math.round(W * 0.44);
-  const card = (c, left, top, data) =>
-    `<div class="c" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;background-image:url(${img(c)})" ${data}>` +
-    (big && c.u ? `<span class="ix${isRed(c.s) ? ' r' : ''}" style="font-size:${ixFont}px">${RANKS[c.r]}${SUITS[c.s]}</span>` : '') + `</div>`;
-  const slot = (left, top, data, label, size) =>
-    `<div class="slot" style="left:${left}px;top:${top}px;width:${W}px;height:${H}px;font-size:${size}px" ${data}>${label}</div>`;
+  const big = W < 72, ixFont = Math.round(W * 0.42);
+  const seen = new Set();
+  let z = 0;
+  const place = (key, left, top, cls) => {
+    let el = els.get(key);
+    const fresh = !el;
+    if (fresh) { el = document.createElement('div'); el.className = cls; els.set(key, el); board.appendChild(el); }
+    el.classList.remove('hint', 'hint-from');
+    const t = `translate(${left}px,${top}px)`;
+    if (!fresh && el._t && el._t !== t && !resized) {
+      el.classList.add('moving'); clearTimeout(el._mv); el._mv = setTimeout(() => el.classList.remove('moving'), 240);
+    }
+    if (el._t !== t) { el.style.transform = t; el._t = t; }
+    el.style.zIndex = ++z;
+    if (el._w !== W) { el.style.width = W + 'px'; el.style.height = H + 'px'; el._w = W; }
+    seen.add(key);
+    return el;
+  };
+  const card = (c, left, top, data) => {
+    const el = place('c' + (c.s * 13 + c.r), left, top, 'c');
+    const face = img(c), ix = big && c.u ? `${RANKS[c.r]}${SUITS[c.s]}|${ixFont}` : '';
+    if (el._face !== face) { el.style.backgroundImage = `url(${face})`; el._face = face; }
+    if (el._ix !== ix) {
+      el.innerHTML = ix ? `<span class="ix${isRed(c.s) ? ' r' : ''}" style="font-size:${ixFont}px">${RANKS[c.r]}${SUITS[c.s]}</span>` : '';
+      el._ix = ix;
+    }
+    setData(el, data);
+  };
+  const slot = (key, left, top, data, label, size) => {
+    const el = place(key, left, top, 'slot');
+    el.style.zIndex = 0;
+    if (el.textContent !== label) el.textContent = label;
+    el.style.fontSize = size + 'px';
+    setData(el, data);
+  };
 
-  // stock
-  if (S.stock.length) parts.push(card({ u:false }, x(6), 0, 'data-z="stock"'));
-  else parts.push(slot(x(6), 0, 'data-z="stock"', S.waste.length ? '↻' : '', Math.round(W * 0.5)));
-  // waste
-  if (S.waste.length > 1) parts.push(card(S.waste[S.waste.length-2], x(5), 0, 'data-z="waste"'));
-  if (S.waste.length) parts.push(card(S.waste[S.waste.length-1], x(5), 0, 'data-z="waste"'));
-  // foundations
+  // slots sit under everything
+  slot('s-stock', x(6), 0, { z:'stock' }, S.stock.length ? '' : (S.waste.length ? '↻' : ''), Math.round(W * 0.5));
+  for (let s = 0; s < 4; s++) slot('s-f' + s, x(s), 0, { z:'found', c:s }, SUITS[s], Math.round(W * 0.5));
+  const top0 = H + gap * 3, avail = bh - top0 - 2;
+  for (let k = 0; k < 7; k++) slot('s-t' + k, x(k), top0, { z:'tab', c:k, i:0 }, '', 0);
+
+  // foundations: top two cards, so a card landing there slides over the one below
   for (let s = 0; s < 4; s++) {
     const f = S.found[s];
-    if (f.length) parts.push(card(f[f.length-1], x(s), 0, `data-z="found" data-c="${s}"`));
-    else parts.push(slot(x(s), 0, `data-z="found" data-c="${s}"`, SUITS[s], Math.round(W * 0.5)));
+    for (let i = Math.max(0, f.length - 2); i < f.length; i++) card(f[i], x(s), 0, { z:'found', c:s });
   }
-  // tableau
-  const top0 = H + gap * 3, avail = bh - top0 - 2;
+  // stock: top card face down, so drawing slides it across to the waste
+  if (S.stock.length) card(S.stock[S.stock.length-1], x(6), 0, { z:'stock' });
+  // waste: top two cards
+  for (let i = Math.max(0, S.waste.length - 2); i < S.waste.length; i++) card(S.waste[i], x(5), 0, { z:'waste' });
+  // tableau: more room between face-up cards so each one is easy to read and tap
   S.tab.forEach((col, k) => {
-    parts.push(slot(x(k), top0, `data-z="tab" data-c="${k}" data-i="0"`, '', 0));
-    let dDown = H * 0.12, dUp = H * 0.33;
+    const dDown = H * 0.14, dUp = H * 0.36;
     let need = 0; for (let i = 0; i < col.length - 1; i++) need += col[i].u ? dUp : dDown;
     const scale = need > 0 && need + H > avail ? Math.max(0.2, (avail - H) / need) : 1;
     let y = top0;
     col.forEach((c, i) => {
-      parts.push(card(c, x(k), Math.round(y), `data-z="tab" data-c="${k}" data-i="${i}"`));
+      card(c, x(k), Math.round(y), { z:'tab', c:k, i });
       y += (c.u ? dUp : dDown) * scale;
     });
   });
-  board.innerHTML = parts.join('');
+  for (const [key, el] of els) if (!seen.has(key)) { el.remove(); els.delete(key); }
+  if (resized) requestAnimationFrame(() => requestAnimationFrame(() => board.classList.remove('still')));
   $('stats').innerHTML = `Won ${stats.w} <span>·</span> Lost ${stats.l}`;
   $('finish').hidden = !canAutoFinish();
   $('undo').disabled = !undoStack.length || S.won;
@@ -497,6 +542,9 @@ $('finish').addEventListener('click', () => { if (canAutoFinish()) { startClock(
 $('deal').addEventListener('click', reshuffle);
 $('again').addEventListener('click', newGame);
 addEventListener('resize', () => render());
+// The header font loads late and nudges the board size; redraw then, so the player's first move still slides.
+if (window.ResizeObserver) new ResizeObserver(() => S && render()).observe(board);
+if (document.fonts) document.fonts.ready.then(() => S && render());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { pauseClock(); save(); } else startClock();
 });
